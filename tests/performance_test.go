@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -9,9 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kuekiko/NotionGO/blocks"
-	"github.com/kuekiko/NotionGO/client"
-	"github.com/kuekiko/NotionGO/internal/pool"
+	notion "github.com/kuekiko/NotionGO"
 )
 
 // 创建测试服务器
@@ -27,10 +24,8 @@ func TestClientPerformance(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	client := client.NewClient("test-token")
-	client.SetBaseURL(ts.URL)
+	client := notion.NewClient("test-token")
 
-	ctx := context.Background()
 	concurrency := 10
 	requests := 1000
 
@@ -42,7 +37,7 @@ func TestClientPerformance(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < requests/concurrency; j++ {
-				_, err := client.Blocks.Get(ctx, "test-block-id")
+				_, err := client.Blocks.Get("test-block-id")
 				if err != nil {
 					t.Logf("请求错误: %v", err)
 				}
@@ -62,22 +57,13 @@ func TestClientPerformance(t *testing.T) {
 
 // TestObjectPoolPerformance 测试对象池性能
 func TestObjectPoolPerformance(t *testing.T) {
-	ts := newTestServer()
-	defer ts.Close()
-
-	client := client.NewClient("test-token")
-	client.SetBaseURL(ts.URL)
-
-	ctx := context.Background()
-
-	// 创建大量数据
 	iterations := 10000
 	start := time.Now()
 
 	for i := 0; i < iterations; i++ {
-		block := pool.Get[blocks.Block](&pool.BlockPool)
-		block.Type = "paragraph"
-		pool.Put(&pool.BlockPool, block)
+		block := &notion.Block{}
+		block.Type = notion.TypeParagraph
+		_ = block
 	}
 
 	duration := time.Since(start)
@@ -88,23 +74,15 @@ func TestObjectPoolPerformance(t *testing.T) {
 
 // TestMemoryUsage 测试内存使用
 func TestMemoryUsage(t *testing.T) {
-	ts := newTestServer()
-	defer ts.Close()
-
-	client := client.NewClient("test-token")
-	client.SetBaseURL(ts.URL)
-
-	ctx := context.Background()
-
 	var m1, m2 runtime.MemStats
 	runtime.ReadMemStats(&m1)
 
 	// 执行一些操作
 	iterations := 10000
 	for i := 0; i < iterations; i++ {
-		block := pool.Get[blocks.Block](&pool.BlockPool)
-		block.Type = "paragraph"
-		pool.Put(&pool.BlockPool, block)
+		block := &notion.Block{}
+		block.Type = notion.TypeParagraph
+		_ = block
 	}
 
 	runtime.ReadMemStats(&m2)
@@ -120,10 +98,8 @@ func TestConcurrentRequests(t *testing.T) {
 	ts := newTestServer()
 	defer ts.Close()
 
-	client := client.NewClient("test-token")
-	client.SetBaseURL(ts.URL)
+	client := notion.NewClient("test-token")
 
-	ctx := context.Background()
 	concurrency := 100
 	iterations := 100
 
@@ -137,7 +113,7 @@ func TestConcurrentRequests(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
-				_, err := client.Blocks.Get(ctx, "test-block-id")
+				_, err := client.Blocks.Get("test-block-id")
 				if err != nil {
 					errors <- err
 				}

@@ -1,28 +1,5 @@
 # Notion SDK for Go API 文档
 
-## 目录
-
-- [概述](#概述)
-- [安装](#安装)
-- [快速开始](#快速开始)
-- [客户端配置](#客户端配置)
-- [错误处理](#错误处理)
-- [速率限制](#速率限制)
-- [API 参考](#api-参考)
-- [最佳实践](#最佳实践)
-- [性能优化](#性能优化)
-
-## 概述
-
-Notion SDK for Go 是一个用于访问 Notion API v1 的 Go 语言客户端库。它提供了以下功能：
-
-- 完整的 Notion API v1 支持
-- 类型安全的 API 调用
-- 自动重试和错误处理
-- 速率限制处理
-- 并发安全
-- 性能优化
-
 ## 安装
 
 ```bash
@@ -35,7 +12,6 @@ go get github.com/kuekiko/NotionGO
 package main
 
 import (
-    "context"
     "fmt"
     notion "github.com/kuekiko/NotionGO"
 )
@@ -45,7 +21,7 @@ func main() {
     client := notion.NewClient("your-api-key")
 
     // 获取数据库
-    db, err := client.Database.Get(context.Background(), "database-id")
+    db, err := client.Database.Get("database-id")
     if err != nil {
         panic(err)
     }
@@ -54,122 +30,76 @@ func main() {
 }
 ```
 
-## 客户端配置
-
-客户端支持多种配置选项：
-
-```go
-client := notion.NewClient(
-    "your-api-key",
-    notion.WithMaxRetries(5),                    // 设置最大重试次数
-    notion.WithRetryWaitTime(1*time.Second, 30*time.Second), // 设置重试等待时间
-    notion.WithTimeout(30*time.Second),          // 设置超时时间
-    notion.WithHTTPClient(customHTTPClient),     // 设置自定义 HTTP 客户端
-)
-```
-
-## 错误处理
-
-SDK 定义了多种错误类型：
-
-```go
-if err != nil {
-    switch {
-    case errors.IsNotFound(err):
-        // 处理 404 错误
-    case errors.IsRateLimited(err):
-        // 处理速率限制错误
-    case errors.IsSizeLimitExceeded(err):
-        // 处理大小限制错误
-    case errors.IsValidationError(err):
-        // 处理验证错误
-    default:
-        // 处理其他错误
-    }
-}
-```
-
-## 速率限制
-
-SDK 自动处理速率限制：
-
-```go
-// 获取当前速率限制状态
-rateLimit := client.GetRateLimit()
-fmt.Printf("剩余请求数: %d\n", rateLimit.Remaining)
-fmt.Printf("重置时间: %s\n", rateLimit.ResetAt)
-
-// 等待直到速率限制重置
-client.WaitForRateLimit()
-```
-
 ## API 参考
+
+### 客户端
+
+```go
+// 创建客户端
+client := notion.NewClient("your-api-key")
+```
 
 ### 数据库操作
 
 ```go
 // 获取数据库
-db, err := client.Database.Get(ctx, "database-id")
-
-// 查询数据库
-results, err := client.Database.Query(ctx, "database-id", &database.QueryParams{
-    Filter: map[string]interface{}{
-        "property": "Status",
-        "select": map[string]interface{}{
-            "equals": "Done",
-        },
-    },
-    Sorts: []database.Sort{
-        {
-            Property:  "LastEdited",
-            Direction: "descending",
-        },
-    },
-    PageSize: 100,
-})
+db, err := client.Database.Get("database-id")
 
 // 创建数据库
-newDB, err := client.Database.Create(ctx, &database.CreateParams{
-    Parent: database.Parent{
+createParams := &notion.DatabaseCreateParams{
+    Parent: notion.Parent{
         Type:   "page_id",
-        PageID: "parent-page-id",
+        PageID: "page-id",
     },
-    Title: []database.RichText{
+    Title: []notion.RichText{
         {
             Type: "text",
-            Text: database.Text{
-                Content: "项目跟踪",
+            Text: &notion.Text{
+                Content: "数据库标题",
             },
         },
     },
-    Properties: map[string]database.Property{
+    Properties: map[string]notion.Property{
         "Name": {
-            Type: "title",
-            Name: "Name",
+            Type:  "title",
+            Title: &notion.EmptyObject{},
         },
         "Status": {
             Type: "select",
-            Select: &database.SelectOptions{
-                Options: []database.Option{
-                    {Name: "Not Started", Color: "gray"},
-                    {Name: "In Progress", Color: "blue"},
-                    {Name: "Done", Color: "green"},
+            Select: &notion.SelectConfig{
+                Options: []notion.Option{
+                    {Name: "未开始", Color: "gray"},
+                    {Name: "进行中", Color: "blue"},
+                    {Name: "已完成", Color: "green"},
                 },
             },
         },
     },
-})
+}
+db, err := client.Database.Create(createParams)
+
+// 查询数据库
+queryParams := &notion.DatabaseQueryParams{
+    Filter: map[string]interface{}{
+        "property": "Status",
+        "select": map[string]interface{}{
+            "equals": "进行中",
+        },
+    },
+    PageSize: 10,
+}
+results, err := client.Database.Query("database-id", queryParams)
 ```
 
 ### 页面操作
 
 ```go
 // 获取页面
-page, err := client.Pages.Get(ctx, "page-id")
+page, err := client.Pages.Get("page-id")
 
 // 创建页面
-newPage, err := client.Pages.Create(ctx, &pages.CreateParams{
-    Parent: pages.Parent{
+createParams := &notion.PageCreateParams{
+    Parent: notion.Parent{
         Type:       "database_id",
         DatabaseID: "database-id",
     },
@@ -178,78 +108,109 @@ newPage, err := client.Pages.Create(ctx, &pages.CreateParams{
             "title": []map[string]interface{}{
                 {
                     "text": map[string]interface{}{
-                        "content": "新任务",
+                        "content": "页面标题",
                     },
                 },
             },
         },
-        "Status": map[string]interface{}{
-            "select": map[string]interface{}{
-                "name": "Not Started",
-            },
-        },
     },
-})
+}
+page, err := client.Pages.Create(createParams)
 
 // 更新页面
-updatedPage, err := client.Pages.Update(ctx, "page-id", &pages.UpdateParams{
+updatePage := &notion.Page{
     Properties: map[string]interface{}{
-        "Status": map[string]interface{}{
-            "select": map[string]interface{}{
-                "name": "In Progress",
+        "Name": map[string]interface{}{
+            "title": []map[string]interface{}{
+                {
+                    "text": map[string]interface{}{
+                        "content": "更新后的标题",
+                    },
+                },
             },
         },
     },
-})
+}
+page, err := client.Pages.Update("page-id", updatePage)
 ```
 
 ### 块操作
 
 ```go
 // 获取块
-block, err := client.Blocks.Get(ctx, "block-id")
+block, err := client.Blocks.Get("block-id")
+
+// 更新块
+updateBlock := &notion.Block{
+    Type: notion.TypeParagraph,
+    Paragraph: &notion.ParagraphBlock{
+        RichText: []notion.RichText{
+            {
+                Type: "text",
+                Text: &notion.Text{
+                    Content: "更新后的内容",
+                },
+            },
+        },
+    },
+}
+block, err := client.Blocks.Update("block-id", updateBlock)
 
 // 获取子块
-children, err := client.Blocks.GetChildren(ctx, "block-id")
-
-// 添加块
-newBlocks, err := client.Blocks.AppendChildren(ctx, "block-id", []blocks.Block{
-    notion.BlockBuilder(blocks.TypeParagraph).
-        WithParagraph("这是一个段落").
-        Build(),
-    notion.BlockBuilder(blocks.TypeHeading1).
-        WithHeading("这是一个标题").
-        Build(),
+children, err := client.Blocks.ListChildren("block-id", &notion.ListParams{
+    PageSize: 10,
 })
 
-// 删除块
-err := client.Blocks.Delete(ctx, "block-id")
+// 追加子块
+children := []notion.Block{
+    {
+        Type: notion.TypeParagraph,
+        Paragraph: &notion.ParagraphBlock{
+            RichText: []notion.RichText{
+                {
+                    Type: "text",
+                    Text: &notion.Text{
+                        Content: "新段落",
+                    },
+                },
+            },
+        },
+    },
+}
+result, err := client.Blocks.AppendChildren("block-id", children)
 ```
 
 ### 搜索操作
 
 ```go
 // 搜索
-results, err := client.Search.Search(ctx, notion.SearchBuilder().
-    Query("项目").
-    FilterByType("page").
-    SortBy("descending", "last_edited_time").
-    PageSize(10).
-    Build())
+params := &notion.SearchParams{
+    Query: "搜索关键词",
+    Filter: &notion.SearchFilter{
+        Property: "object",
+        Value:    "page",
+    },
+    Sort: &notion.SearchSort{
+        Direction: "descending",
+        Timestamp: "last_edited_time",
+    },
+    PageSize: 10,
+}
+results, err := client.Search.Search(params)
 ```
 
 ### 用户操作
 
 ```go
 // 获取当前用户
-me, err := client.Users.Me(ctx)
+me, err := client.Users.Me()
 
 // 获取用户
-user, err := client.Users.Get(ctx, "user-id")
+user, err := client.Users.Get("user-id")
 
 // 列出用户
-users, err := client.Users.List(ctx, &users.ListParams{
-    PageSize: 100,
+users, err := client.Users.List(&notion.ListParams{
+    PageSize: 10,
 })
 ```
 
@@ -257,132 +218,179 @@ users, err := client.Users.List(ctx, &users.ListParams{
 
 ```go
 // 创建评论
-comment, err := client.Comments.Create(ctx, &comments.CreateParams{
-    ParentID:   "page-id",
-    ParentType: "page_id",
-    RichText: []comments.RichText{
+createParams := &notion.CreateCommentParams{
+    ParentID:   "block-id",
+    ParentType: "block_id",
+    RichText: []notion.RichText{
         {
             Type: "text",
-            Text: &comments.Text{
-                Content: "这是一条评论",
+            Text: &notion.Text{
+                Content: "评论内容",
             },
         },
     },
-})
+}
+comment, err := client.Comments.Create(createParams)
 
-// 获取评论
-comments, err := client.Comments.List(ctx, &comments.ListParams{
-    BlockID: "block-id",
+// 列出评论
+comments, err := client.Comments.List("block-id", &notion.ListParams{
+    PageSize: 10,
 })
+```
+
+## 错误处理
+
+SDK 使用自定义的错误类型 `notion.Error`，可以通过以下方式处理错误：
+
+```go
+if err != nil {
+    if notionErr, ok := err.(*notion.Error); ok {
+        fmt.Printf("错误代码: %s\n", notionErr.Code)
+        fmt.Printf("错误消息: %s\n", notionErr.Message)
+        fmt.Printf("HTTP 状态码: %d\n", notionErr.Status)
+    }
+}
+```
+
+## 类型定义
+
+### 基本类型
+
+```go
+// RichText 表示富文本内容
+type RichText struct {
+    Type        string      `json:"type"`
+    Text        *Text       `json:"text,omitempty"`
+    Annotations *Annotation `json:"annotations,omitempty"`
+    PlainText   string      `json:"plain_text"`
+    Href        string      `json:"href,omitempty"`
+}
+
+// Text 表示文本内容
+type Text struct {
+    Content string `json:"content"`
+    Link    *Link  `json:"link,omitempty"`
+}
+
+// Link 表示链接
+type Link struct {
+    URL string `json:"url"`
+}
+
+// Annotation 表示文本注释
+type Annotation struct {
+    Bold          bool   `json:"bold"`
+    Italic        bool   `json:"italic"`
+    Strikethrough bool   `json:"strikethrough"`
+    Underline     bool   `json:"underline"`
+    Code          bool   `json:"code"`
+    Color         Color  `json:"color"`
+}
+```
+
+### 块类型
+
+```go
+// Block 表示块对象
+type Block struct {
+    Object         string          `json:"object"`
+    ID            string          `json:"id"`
+    Parent        Parent          `json:"parent"`
+    Type          BlockType       `json:"type"`
+    CreatedTime   string          `json:"created_time"`
+    LastEditedTime string         `json:"last_edited_time"`
+    CreatedBy     User           `json:"created_by"`
+    LastEditedBy  User           `json:"last_edited_by"`
+    HasChildren   bool           `json:"has_children"`
+    Archived      bool           `json:"archived"`
+
+    // 不同类型的块具有不同的属性
+    Paragraph       *ParagraphBlock       `json:"paragraph,omitempty"`
+    Heading1        *HeadingBlock         `json:"heading_1,omitempty"`
+    Heading2        *HeadingBlock         `json:"heading_2,omitempty"`
+    Heading3        *HeadingBlock         `json:"heading_3,omitempty"`
+    BulletedListItem *ListItemBlock        `json:"bulleted_list_item,omitempty"`
+    NumberedListItem *ListItemBlock        `json:"numbered_list_item,omitempty"`
+    ToDo            *ToDoBlock            `json:"to_do,omitempty"`
+    Toggle          *ToggleBlock          `json:"toggle,omitempty"`
+    ChildPage       *ChildPageBlock       `json:"child_page,omitempty"`
+    ChildDatabase   *ChildDatabaseBlock   `json:"child_database,omitempty"`
+    Embed           *EmbedBlock           `json:"embed,omitempty"`
+    Image           *File                 `json:"image,omitempty"`
+    Video           *File                 `json:"video,omitempty"`
+    File            *File                 `json:"file,omitempty"`
+    PDF             *File                 `json:"pdf,omitempty"`
+    Bookmark        *BookmarkBlock        `json:"bookmark,omitempty"`
+    Callout         *CalloutBlock         `json:"callout,omitempty"`
+    Quote           *QuoteBlock           `json:"quote,omitempty"`
+    Equation        *EquationBlock        `json:"equation,omitempty"`
+    Divider         *EmptyObject          `json:"divider,omitempty"`
+    TableOfContents *EmptyObject          `json:"table_of_contents,omitempty"`
+    Breadcrumb      *EmptyObject          `json:"breadcrumb,omitempty"`
+    ColumnList      *ColumnListBlock      `json:"column_list,omitempty"`
+    Column          *ColumnBlock          `json:"column,omitempty"`
+    LinkPreview     *LinkPreviewBlock     `json:"link_preview,omitempty"`
+    Template        *TemplateBlock        `json:"template,omitempty"`
+    SyncedBlock     *SyncedBlock          `json:"synced_block,omitempty"`
+    Table           *TableBlock           `json:"table,omitempty"`
+    TableRow        *TableRowBlock        `json:"table_row,omitempty"`
+    Code            *CodeBlock            `json:"code,omitempty"`
+}
 ```
 
 ## 最佳实践
 
-1. 使用上下文控制请求超时：
+1. 使用 Builder 模式构建复杂的搜索参数：
 
 ```go
-ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-defer cancel()
+params := notion.NewSearchBuilder().
+    Query("搜索关键词").
+    Filter(&notion.SearchFilter{
+        Property: "object",
+        Value:    "page",
+    }).
+    Sort(&notion.SearchSort{
+        Direction: "descending",
+        Timestamp: "last_edited_time",
+    }).
+    PageSize(10).
+    Build()
 
-db, err := client.Database.Get(ctx, "database-id")
+results, err := client.Search.Search(params)
 ```
 
-2. 批量操作时使用分页：
+2. 使用类型断言安全地处理属性：
 
 ```go
-var allResults []pages.Page
-startCursor := ""
-
-for {
-    results, err := client.Database.Query(ctx, "database-id", &database.QueryParams{
-        StartCursor: startCursor,
-        PageSize:    100,
-    })
-    if err != nil {
-        return err
+if title, ok := page.Properties["Name"].(map[string]interface{}); ok {
+    if titleArr, ok := title["title"].([]interface{}); ok && len(titleArr) > 0 {
+        if titleObj, ok := titleArr[0].(map[string]interface{}); ok {
+            if textObj, ok := titleObj["text"].(map[string]interface{}); ok {
+                if content, ok := textObj["content"].(string); ok {
+                    fmt.Printf("页面标题: %s\n", content)
+                }
+            }
+        }
     }
-
-    allResults = append(allResults, results.Results...)
-
-    if !results.HasMore {
-        break
-    }
-    startCursor = results.NextCursor
 }
 ```
 
-3. 处理大型响应时使用流式处理：
+3. 使用常量定义块类型和颜色：
 
 ```go
-err := client.Database.QueryStream(ctx, "database-id", &database.QueryParams{}, func(page *pages.Page) error {
-    // 处理每个页面
-    return nil
-})
-```
-
-4. 使用重试机制处理临时错误：
-
-```go
-client := notion.NewClient(
-    "your-api-key",
-    notion.WithMaxRetries(5),
-    notion.WithRetryWaitTime(1*time.Second, 30*time.Second),
-)
-```
-
-5. 使用验证器检查输入：
-
-```go
-params := &database.CreateParams{
-    // ...
+block := &notion.Block{
+    Type: notion.TypeParagraph,
+    Paragraph: &notion.ParagraphBlock{
+        RichText: []notion.RichText{
+            {
+                Type: "text",
+                Text: &notion.Text{
+                    Content: "段落内容",
+                },
+                Annotations: &notion.Annotation{
+                    Color: notion.ColorBlue,
+                },
+            },
+        },
+    },
 }
-if err := params.Validate(); err != nil {
-    return err
-}
-```
-
-## 性能优化
-
-1. 使用对象池减少内存分配：
-
-```go
-// 获取对象
-richText := pool.Get[blocks.RichText](&pool.RichTextPool)
-defer pool.Put(&pool.RichTextPool, richText)
-```
-
-2. 使用压缩传输：
-
-```go
-client := notion.NewClient(
-    "your-api-key",
-    notion.WithCompression(true),
-)
-```
-
-3. 使用连接池：
-
-```go
-client := notion.NewClient(
-    "your-api-key",
-    notion.WithMaxIdleConns(100),
-    notion.WithMaxIdleConnsPerHost(10),
-)
-```
-
-4. 使用缓存：
-
-```go
-client := notion.NewClient(
-    "your-api-key",
-    notion.WithCache(cache.NewMemoryCache()),
-)
-```
-
-5. 使用并发控制：
-
-```go
-client := notion.NewClient(
-    "your-api-key",
-    notion.WithMaxConcurrentRequests(100),
-)

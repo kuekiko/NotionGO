@@ -139,14 +139,14 @@ if err != nil {
 ### 使用对象池
 
 ```go
-// 获取对象
-richText := pool.Get[blocks.RichText](&pool.RichTextPool)
+// 从对象池获取富文本对象
+richText := pool.Get[common.RichText](&pool.RichTextPool)
 defer pool.Put(&pool.RichTextPool, richText)
 
-// 使用对象
+// 设置富文本内容
 richText.Type = "text"
-richText.Text = &blocks.Text{
-    Content: "Hello, World!",
+richText.Text = &common.Text{
+	Content: "Hello World",
 }
 ```
 

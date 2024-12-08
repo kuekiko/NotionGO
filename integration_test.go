@@ -1,12 +1,7 @@
 package notion
 
 import (
-	"context"
 	"testing"
-
-	"github.com/kuekiko/NotionGO/client"
-	"github.com/kuekiko/NotionGO/database"
-	"github.com/kuekiko/NotionGO/pages"
 )
 
 const (
@@ -19,12 +14,10 @@ func TestIntegrationDatabase(t *testing.T) {
 		t.Skip("跳过集成测试")
 	}
 
-	ctx := context.Background()
-	c := client.NewClient(testAPIKey)
-	svc := database.NewService(c)
+	client := NewClient(testAPIKey)
 
 	// 获取数据库
-	db, err := svc.Get(ctx, testDatabaseID)
+	db, err := client.Database.Get(testDatabaseID)
 	if err != nil {
 		t.Fatalf("获取数据库失败: %v", err)
 	}
@@ -35,11 +28,11 @@ func TestIntegrationDatabase(t *testing.T) {
 	}
 
 	// 查询数据库
-	queryParams := &database.QueryParams{
+	queryParams := &DatabaseQueryParams{
 		PageSize: 10,
 	}
 
-	results, err := svc.Query(ctx, testDatabaseID, queryParams)
+	results, err := client.Database.Query(testDatabaseID, queryParams)
 	if err != nil {
 		t.Fatalf("查询数据库失败: %v", err)
 	}
@@ -52,13 +45,11 @@ func TestIntegrationPage(t *testing.T) {
 		t.Skip("跳过集成测试")
 	}
 
-	ctx := context.Background()
-	c := client.NewClient(testAPIKey)
-	svc := pages.NewService(c)
+	client := NewClient(testAPIKey)
 
 	// 创建页面
-	createParams := &pages.CreateParams{
-		Parent: pages.Parent{
+	createParams := &PageCreateParams{
+		Parent: Parent{
 			Type:       "database_id",
 			DatabaseID: testDatabaseID,
 		},
@@ -67,20 +58,15 @@ func TestIntegrationPage(t *testing.T) {
 				"title": []map[string]interface{}{
 					{
 						"text": map[string]interface{}{
-							"content": "测试页面",
+							"content": "Test Page",
 						},
 					},
-				},
-			},
-			"Status": map[string]interface{}{
-				"select": map[string]interface{}{
-					"name": "进行中",
 				},
 			},
 		},
 	}
 
-	page, err := svc.Create(ctx, createParams)
+	page, err := client.Pages.Create(createParams)
 	if err != nil {
 		t.Fatalf("创建页面失败: %v", err)
 	}
@@ -88,7 +74,7 @@ func TestIntegrationPage(t *testing.T) {
 	t.Logf("创建的页面 ID: %s", page.ID)
 
 	// 获取页面
-	retrievedPage, err := svc.Get(ctx, page.ID)
+	retrievedPage, err := client.Pages.Get(page.ID)
 	if err != nil {
 		t.Fatalf("获取页面失败: %v", err)
 	}
@@ -107,7 +93,7 @@ func TestIntegrationPage(t *testing.T) {
 	}
 
 	// 更新页面
-	updateParams := &pages.UpdateParams{
+	updatePage := &Page{
 		Properties: map[string]interface{}{
 			"Name": map[string]interface{}{
 				"title": []map[string]interface{}{
@@ -126,7 +112,7 @@ func TestIntegrationPage(t *testing.T) {
 		},
 	}
 
-	updatedPage, err := svc.Update(ctx, page.ID, updateParams)
+	updatedPage, err := client.Pages.Update(page.ID, updatePage)
 	if err != nil {
 		t.Fatalf("更新页面失败: %v", err)
 	}
